@@ -5,6 +5,7 @@
 #-------------------------------------------------
 
 QT       += core gui
+QT       += serialport
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -27,11 +28,11 @@ CONFIG += c++11
 SOURCES += \
         main.cpp \
         configapp.cpp \
-        serialport.cpp
+        uwbmodule.cpp
 
 HEADERS += \
         configapp.h \
-        serialport.h
+        uwbmodule.h
 
 FORMS += \
         configapp.ui

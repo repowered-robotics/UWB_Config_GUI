@@ -2,9 +2,11 @@
 #define CONFIGAPP_H
 
 #include <QMainWindow>
-#include "serialport.h"
-#include "WinBase.h"
-#include "Windows.h"
+#include <QSerialPortInfo>
+//#include "serialport.h"
+//#include "WinBase.h"
+//#include "Windows.h"
+#include "uwbmodule.h"
 
 namespace Ui {
 class configApp;
@@ -23,7 +25,12 @@ private slots:
 
     void on_refreshToolBtn_clicked();
 
+    void on_readSettingsBtn_clicked();
+
+    void on_uploadSettingsBtn_clicked();
+
 private:
+    UwbModule module;
     Ui::configApp *ui;
 };
 

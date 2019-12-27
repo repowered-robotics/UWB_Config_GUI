@@ -6,13 +6,16 @@ std::vector<QString> getComPorts(){
 
     wchar_t lpTargetPath[5000]; // to store the path of the COM ports
 
-    for(int i = 0; i < 256; i++){
-        std::string comStr = "COM" + std::to_string(i);
-        const wchar_t* str = std::wstring(comStr.begin(), comStr.end()).c_str();
-        DWORD test = QueryDosDevice(str, lpTargetPath, 5000);
+    for(int i = 0; i < 3; i++){
+        char com_c_str[32];
+        sprintf(com_c_str, "\\Device\\USBPDO-%d", i);
+        printf("%s\r\n", com_c_str);
+        DWORD test = QueryDosDevice((wchar_t*)com_c_str, lpTargetPath, 5000);
 
         if(test != 0){
-            ports.push_back(QString(comStr.c_str()));
+            printf("%s\n", com_c_str);
+            printf("%s\n", "We got one!!");
+            ports.push_back(QString(com_c_str));
         }
     }
 

@@ -4,6 +4,7 @@
 #include <QObject>
 #include "Windows.h"
 
+
 std::vector<QString> getComPorts();
 
 class SerialPort : public QObject
