@@ -1,8 +1,22 @@
 #include "uwbmodule.h"
 
+AnchorData::AnchorData(const AnchorData &anchor){
+    id = anchor.id;
+    timestamp = anchor.timestamp;
+    x = anchor.x;
+    y = anchor.y;
+    z = anchor.z;
+    distance = anchor.distance;
+    rx_power = anchor.rx_power;
+    fp_power = anchor.fp_power;
+    fp_snr = anchor.fp_snr;
+}
 
 void UwbModule::setComport(QString port)
 {
+    if(this->serial.isOpen()){
+        this->serial.close();
+    }
     this->serial.setPortName(port);
     this->serial.setBaudRate(UWB_BAUD_RATE, QSerialPort::AllDirections);
     this->serial.setDataBits(QSerialPort::Data8);
@@ -57,9 +71,76 @@ void UwbModule::writeAllFields(){
         qDebug() << "Write success!";
     }
     QByteArray rpy;
+    while(this->serial.waitForReadyRead(100))
+        rpy.append(this->serial.readAll());
+
+}
+/**
+ * @brief UwbModule::readAnchors read and parse the list of anchor data from the UWB module
+ */
+void UwbModule::readAnchors(){
+    if(!this->openSuccess || !this->serial.isOpen())
+        return;
+    QByteArray cmd;
+    cmd.append(char(READ_ANCHORS));
+    cmd.append('\0');
+    cmd.append(char(STOP_BYTE));
+
+    this->serial.write(cmd);
+
+    QByteArray rpy;
     while(this->serial.waitForReadyRead(250))
         rpy.append(this->serial.readAll());
 
+    if(rpy[0] != char(READ_ANCHORS) || rpy[rpy.length()-1] != char(STOP_BYTE))
+        return;
+
+    int body_size = rpy[1];
+    const char* rpy_data = rpy.data();
+
+    this->anchors.clear();
+
+    for(int i = HDDR_SIZE; i < HDDR_SIZE + body_size; ){
+        AnchorData anchor;
+        anchor.id           = uint32_t(rpy[i++]) & 0xFF;
+        anchor.timestamp    = uint32_t( (rpy[i]) | (rpy[i+1] << 8) | (rpy[i+2] << 16) | (rpy[i+3] << 24) );
+        i += 4;
+        memcpy(&anchor.x, rpy_data + i, 4);
+        i += 4;
+        memcpy(&anchor.y, rpy_data + i, 4);
+        i += 4;
+        memcpy(&anchor.z, rpy_data + i, 4);
+        i += 4;
+        memcpy(&anchor.distance, rpy_data + i, 4);
+        i += 4;
+        memcpy(&anchor.rx_power, rpy_data + i, 4);
+        i += 4;
+        memcpy(&anchor.fp_power, rpy_data + i, 4);
+        i += 4;
+        memcpy(&anchor.fp_snr, rpy_data + i, 4);
+        i += 4;
+        qDebug() << anchor.toString();
+        this->anchors.append(anchor);
+    }
+
+}
+
+QString AnchorData::toString(){
+    QString retval;
+    retval.append(QString("%1 ").arg(this->id));
+    retval.append(QString("(%1, %2, %3) ")
+                  .arg(this->x,0,'f',2).arg(this->y,0,'f',2).arg(this->z,0,'f',2));
+    retval.append(QString("%1m ").arg(double(this->distance),0,'f',2));
+    retval.append(QString("%1dBm").arg(double(this->rx_power),0,'f',1));
+    return retval;
+}
+
+QString UwbModule::anchorsToString(){
+    QString retval;
+    for(int i = 0; i < this->anchors.size(); i++){
+        retval.append(this->anchors[i].toString());
+    }
+    return retval;
 }
 
 /**
@@ -81,10 +162,10 @@ void UwbModule::updateObject(QByteArray& rpy_arr){
         switch(field){
         case SELF_ID:{
             //memcpy(&this->id, rpy_data + ind, FIELD_DATA_SIZE);
-            this->id = (uint32_t)( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            this->id = uint32_t( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
             break;
         }case MODE:{
-            this->mode = (uint32_t)( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            this->mode = uint32_t( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
             if(this->mode == TAG_MODE){
                 this->modestring = QString("tag");
             }else if(this->mode == ANCHOR_MODE){
@@ -94,22 +175,25 @@ void UwbModule::updateObject(QByteArray& rpy_arr){
             }
             break;
         }case CHANNEL:{
-            this->channel = (uint32_t)( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            this->channel = uint32_t( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
             break;
         }case SAMPLES_PER_RANGE:{
-            this->samplesPerRange = (uint32_t)( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            this->samplesPerRange = uint32_t( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
             break;
         }case NUMBER_OF_ANCHORS:{
-            this->numberOfAnchors = (uint32_t)( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            this->numberOfAnchors = uint32_t( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
             break;
         }case FIELD_X:{
-            this->x = (float)( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            uint32_t temp = uint32_t( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            memcpy(&this->x, rpy + ind, FIELD_DATA_SIZE);
             break;
         }case FIELD_Y:{
-            this->y = (float)( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            uint32_t temp = uint32_t( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            memcpy(&this->y, rpy + ind, FIELD_DATA_SIZE);
             break;
         }case FIELD_Z:{
-            this->z = (float)( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            uint32_t temp = uint32_t( (rpy[ind]) | (rpy[ind+1] << 8) | (rpy[ind+2] << 16) | (rpy[ind+3] << 24) );
+            memcpy(&this->z, rpy + ind, FIELD_DATA_SIZE);
             break;
         }default:
             break;
@@ -313,6 +397,18 @@ int UwbModule::writeFields(QByteArray fieldData){
     return retval;
 }
 
+void UwbModule::saveConfig(){
+    QByteArray cmd;
+    cmd.append(char(SAVE_CONFIG));
+    cmd.append(char(0x00));
+    cmd.append(char(STOP_BYTE));
+    this->serial.write(cmd);
+    QByteArray rpy;
+    while(this->serial.waitForReadyRead(250))
+        rpy.append(this->serial.readAll());
+
+}
+
 
 int UwbModule::addFieldToBuffer(QByteArray& buffer, UwbConfigField fieldId, uint32_t value){
     char* temp = new char[FIELD_DATA_SIZE];
@@ -330,7 +426,6 @@ int UwbModule::addFieldToBuffer(QByteArray& buffer, UwbConfigField fieldId, floa
     char* temp = new char[FIELD_DATA_SIZE];
     memcpy(temp, &value, FIELD_DATA_SIZE);
     buffer.append(char(fieldId));
-    // convert from big endian to little endian
     buffer.append(temp[0]); // LSB copied first
     buffer.append(temp[1]);
     buffer.append(temp[2]);

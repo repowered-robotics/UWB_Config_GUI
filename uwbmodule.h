@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QSerialPort>
 #include <QDebug>
+#include <QVector>
 
 #define MAX_CMD_SIZE    512
 #define MAX_RPY_SIZE    512
@@ -13,14 +14,24 @@
 #define NUM_FIELDS      8
 #define FIELD_DATA_SIZE 4
 #define CMD_WORD_SIZE   (1 + FIELD_DATA_SIZE)
-#define STOP_BYTE       0x000000A5
+#define STOP_BYTE       0xA5
+
+#define ANCHOR_DATA_SIZE 33
+
+#define DFLT_SELF_ID 			0xDF
+#define DFLT_MODE 	 			0
+#define DFLT_CHANNEL 			(uint8_t)2
+#define DFLT_SAMPLES_PER_RANGE 	3
+#define DFLT_NUMBER_OF_ANCHORS 	5
 
 typedef enum COMMANDS {
-    READ    = 0x11,
-    CONFIG  = 0x22,
-    RANGE   = 0x33,
-    RESTART = 0x44,
-    RESET   = 0x55
+    READ         = 0x11,
+    READ_ANCHORS = 0x12,
+    CONFIG       = 0x22,
+    RANGE        = 0x33,
+    RESTART      = 0x44,
+    RESET        = 0x55,
+    SAVE_CONFIG  = 0x66
 }UwbCommand;
 /*
 FIELD_SELF_ID 	= 0x00,
@@ -48,6 +59,23 @@ typedef enum MODES {
     ANCHOR_MODE = 0x01
 } UwbMode;
 
+class AnchorData
+{
+public:
+    AnchorData() {}
+    AnchorData(const AnchorData &anchor);
+    uint32_t id;
+    uint32_t timestamp;
+    float x;
+    float y;
+    float z;
+    float distance;
+    float rx_power;
+    float fp_power;
+    float fp_snr;
+    QString toString();
+};
+
 class UwbModule : public QObject
 {
     Q_OBJECT
@@ -62,9 +90,6 @@ public:
     float x;
     float y;
     float z;
-    float rxPower;
-    float fpPower;
-    float fpSnr;
     QString modestring;
     uint32_t samplesPerRange;
     QString firmwareVersion;
@@ -76,11 +101,13 @@ public:
     void setMode(int n);
     int getChannel();
     int getSamplesPerRange();
+    void readAnchors();
+    void saveConfig();
+    QString anchorsToString();
 
 private:
+    QVector<AnchorData> anchors;
     QSerialPort serial;
-    QByteArray cmdBuffer;
-    QByteArray rpyBuffer;
     QByteArray readFields(QByteArray fields);
     void updateObject(QByteArray& rpy);
     int writeFields(QByteArray fieldData);

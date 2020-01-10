@@ -20,6 +20,8 @@ public:
     explicit configApp(QWidget *parent = nullptr);
     ~configApp();
 
+    void updateAnchorsCallback();
+
 private slots:
     void on_connectBtn_clicked();
 
@@ -29,9 +31,16 @@ private slots:
 
     void on_uploadSettingsBtn_clicked();
 
+    void on_modeBox_currentTextChanged(const QString &arg1);
+
+    void on_saveConfig_btn_clicked();
+
+    void on_readAnchorsBtn_clicked();
+
 private:
     UwbModule module;
     Ui::configApp *ui;
+    int update_count = 0;
 };
 
 #endif // CONFIGAPP_H
